@@ -15,6 +15,11 @@ require BASE_PATH . '/vendor/autoload.php';
 use Workerman\Worker;
 use Workerman\Lib\Timer;
 
+if (!file_exists(BASE_PATH . '/config/config.php')) {
+    echo "config.php not exist \n";
+    exit;
+}
+
 // worker
 $nacosConfigAgentWorker = new Worker();
 $nacosConfigAgentWorker->name = 'nacos_config_agent';

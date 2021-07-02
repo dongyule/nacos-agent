@@ -48,6 +48,9 @@ $nacosServiceAgentWorker = new Worker();
 $nacosServiceAgentWorker->name = 'nacos_service_agent';
 $nacosServiceAgentWorker->onWorkerStart = function () {
     $appConfig = require_once BASE_PATH . '/config/config.php';
+    if (!$appConfig['enable']) {
+        return;
+    }
     // service
     $exist = false;
     $serviceModel = new Nacos\Model\ServiceModel($appConfig['service']);

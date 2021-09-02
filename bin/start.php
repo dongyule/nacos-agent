@@ -3,7 +3,7 @@
 
 ini_set('display_errors', 'on');
 ini_set('display_startup_errors', 'on');
-ini_set('memory_limit', '1G');
+ini_set('memory_limit', '128M');
 
 error_reporting(E_ALL);
 date_default_timezone_set('Asia/Shanghai');
@@ -24,14 +24,19 @@ if (!file_exists(BASE_PATH . '/config/config.php')) {
 $nacosConfigAgentWorker = new Worker();
 $nacosConfigAgentWorker->name = 'nacos_config_agent';
 $nacosConfigAgentWorker->onWorkerStart = function() {
-    $appConfig = require_once BASE_PATH . '/config/config.php';
-    $nacosConfigClient = new Nacos\Config($appConfig);
-    Timer::add($appConfig['config_reload_interval'], function () use ($appConfig, $nacosConfigClient) {
-        foreach ($appConfig['listener_config'] as $item) {
+    $config = require_once BASE_PATH . '/config/config.php';
+    $nacosConfigClient = new Nacos\Config($config);
+    Timer::add($config['config_reload_interval'], function () use ($config, $nacosConfigClient) {
+        foreach ($config['listener_config'] as $item) {
             try {
+                $item['tenant'] = $config['tenant'];
                 $configModel = new Nacos\Model\ConfigModel($item);
                 $configContent = $nacosConfigClient->get($configModel);
-                $filePath = sprintf('%s/%s/%s', rtrim($appConfig['config_save_path'], '/'), $item['group'], $item['data_id']);
+                $filePath = sprintf('%s/%s', rtrim($config['config_save_path'], '/'), $item['data_id']);
+                if (!empty($item['target'])) {
+                    $filePath = sprintf('%s/%s', rtrim($config['config_save_path'], '/'), $item['target']);
+                }
+
                 $file = new SplFileInfo($filePath);
                 if (!is_dir($file->getPath())) {
                     mkdir($file->getPath(), 0755, true);
@@ -40,46 +45,6 @@ $nacosConfigAgentWorker->onWorkerStart = function() {
             } catch (Exception $e) {
                 echo $e->getMessage() . "\n";
             }
-        }
-    });
-};
-
-$nacosServiceAgentWorker = new Worker();
-$nacosServiceAgentWorker->name = 'nacos_service_agent';
-$nacosServiceAgentWorker->onWorkerStart = function () {
-    $appConfig = require_once BASE_PATH . '/config/config.php';
-    if (!$appConfig['enable']) {
-        return;
-    }
-    // service
-    $exist = false;
-    $serviceModel = new Nacos\Model\ServiceModel($appConfig['service']);
-    try {
-        $nacosServiceClient = new Nacos\Service($appConfig);
-        $exist = $nacosServiceClient->detail($serviceModel);
-    } catch (Exception $e) {
-        echo $e->getMessage() . "\n";
-    }
-    if (! $exist && ! $nacosServiceClient->create($serviceModel)) {
-        echo "nacos register service fail \n";
-    }
-    echo "nacos register service success \n";
-
-    // instance
-    $nacosInstanceClient = new Nacos\Instance($appConfig);
-    $instanceModel = new Nacos\Model\InstanceModel($appConfig['client']);
-    if (! $nacosInstanceClient->register($instanceModel)) {
-        echo "nacos register instance fail: \n";
-    }
-    echo "nacos register instance success \n";
-
-    // beat
-    Timer::add($appConfig['client']['beat_interval'], function () use ($appConfig, $nacosInstanceClient, $serviceModel, $instanceModel) {
-        try {
-            $nacosInstanceClient->beat($serviceModel, $instanceModel);
-            echo "beat \n";
-        } catch (Exception $e) {
-            echo $e->getMessage() . "\n";
         }
     });
 };

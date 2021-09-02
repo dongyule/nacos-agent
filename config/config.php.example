@@ -1,51 +1,25 @@
 <?php
 
 return [
-    'enable' => true,
     'host' => '172.17.0.115',
     'port' => '8848',
-    // The service info.
-    'service' => [
-        'service_name' => 'test.php',
-        'group_name' => 'api',
-        'namespace_id' => 'public',
-        'protect_threshold' => 0.5,
-    ],
-    // The client info.
-    'client' => [
-        'namespace_id' => 'public', // It must be equal with service.namespaceId.
-        'service_name' => 'test.php',
-        'group_name' => 'api',
-        'ip' => '127.0.0.1',
-        'port' => 80,
-        'weight' => 100,
-        'cluster' => 'DEFAULT',
-        'ephemeral' => false,
-        'beat_enable' => true,
-        'beat_interval' => 5,
-    ],
     'config_reload_interval' => 3,
     'config_save_path' => '/data/config',
+    'tenant' => 'dev',
     'listener_config' => [
-        // dataId, group, tenant,
+        // dataId, group
         [
-            'tenant' => 'public', // corresponding with service.namespaceId
-            'data_id' => 'test1.json',
+            'data_id' => 'testphp.php',
             'group' => 'DEFAULT_GROUP',
+            'target' => 'php/testphp.php'
         ],
         [
-            'tenant' => 'public',
-            'data_id' => 'test2.json',
+            'data_id' => 'testenv.env',
             'group' => 'DEFAULT_GROUP',
+            'target' => '.env'
         ],
         [
-            'tenant' => 'public',
-            'data_id' => 'test3.json',
-            'group' => 'DEFAULT_GROUP',
-        ],
-        [
-            'tenant' => 'public',
-            'data_id' => 'test4.json',
+            'data_id' => 'testjson.json',
             'group' => 'DEFAULT_GROUP',
         ],
     ],

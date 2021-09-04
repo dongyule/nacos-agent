@@ -12,7 +12,4 @@ vendor/
 .phpunit*
 *.cache
 composer.lock
-config/config.php
-src/composer.lock
-src/vendor
-
+conf/config.json

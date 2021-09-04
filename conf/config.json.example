@@ -1,0 +1,22 @@
+{
+  "host": "172.17.0.115",
+  "port": "8848",
+  "config_save_path": "/data/config",
+  "tenant": "dev",
+  "listener_config": [
+    {
+      "data_id" :"testphp.php",
+      "group": "DEFAULT_GROUP",
+      "target":"php/testphp.php"
+    },
+    {
+      "data_id":"testenv.env",
+      "group": "DEFAULT_GROUP",
+      "target": ".env"
+    },
+    {
+      "data_id": "testjson.json",
+      "group": "DEFAULT_GROUP"
+    }
+  ]
+}

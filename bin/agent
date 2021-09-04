@@ -1,0 +1,108 @@
+#!/usr/bin/env php
+<?php
+
+ini_set('display_errors', 'on');
+ini_set('display_startup_errors', 'on');
+ini_set('memory_limit', '128M');
+
+error_reporting(E_ALL);
+date_default_timezone_set('Asia/Shanghai');
+
+use Workerman\Worker;
+use Workerman\Lib\Timer;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+define('IN_PHAR', boolval(Phar::running(false)));
+define('ROOT', IN_PHAR ? dirname(Phar::running(false)) : realpath(__DIR__ . '/..'));
+$configPath = ROOT . '/conf/';
+$configFile = $configPath . '/config.json';
+if (!file_exists($configFile)) {
+    echo "config.json file not exist \n";
+    exit;
+}
+define('CONFIG_PATH', realpath($configPath) . '/');
+
+// worker
+$nacosConfigAgentWorker = new Worker();
+$nacosConfigAgentWorker->name = 'NacosConfigAgent';
+$nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
+    $config = json_decode(file_get_contents($configFile), true);
+    $nacosConfigClient = new Nacos\Config($config);
+    $configModels = [];
+    $dataIdTargetMap = [];
+    foreach ($config['listener_config'] as $item) {
+        try {
+            $item['tenant'] = $config['tenant'];
+            $configModel = new Nacos\Model\ConfigModel($item);
+            $configModel->content = $nacosConfigClient->get($configModel);
+            $configModels[] = $configModel;
+            $filePath = sprintf('%s/%s', rtrim($config['config_save_path'], '/'), $configModel->dataId);
+            if (!empty($item['target'])) {
+                $filePath = sprintf('%s/%s', rtrim($config['config_save_path'], '/'), $item['target']);
+            }
+            $dataIdTargetMap[$configModel->dataId] = $filePath;
+
+            $file = new SplFileInfo($filePath);
+            if (!is_dir($file->getPath())) {
+                mkdir($file->getPath(), 0755, true);
+            }
+            file_put_contents($filePath, $configModel->content);
+        } catch (Throwable $e) {
+            print $e->getMessage() . "\r\n";
+        }
+    }
+    // listen
+    while (1) {
+        $changes = $nacosConfigClient->listen($configModels);
+        if ($changes) {
+            foreach ($changes as $change) {
+                print "$change->dataId content changed" . "\r\n";
+                foreach ($configModels as $configModel) {
+                    if ($change->dataId == $configModel->dataId) {
+                        $configModel->content = $nacosConfigClient->get($configModel);
+                        file_put_contents($dataIdTargetMap[$configModel->dataId], $configModel->content);
+                    }
+                }
+            }
+        }
+    }
+};
+
+$FileMonitorWorker = new Worker();
+$FileMonitorWorker->name = 'FileMonitor';
+$FileMonitorWorker->reloadable = false;
+$last_reload_time = time();
+$FileMonitorWorker->onWorkerStart = function() {
+    // chek mtime of files per second
+    Timer::add(10, 'check_files_change', array(CONFIG_PATH));
+};
+
+// check files func
+function check_files_change($monitor_dir) {
+    global $last_reload_time;
+    // recursive traversal directory
+    $dir_iterator = new RecursiveDirectoryIterator($monitor_dir);
+    $iterator = new RecursiveIteratorIterator($dir_iterator);
+    foreach ($iterator as $file) {
+        // only check php files
+        if(pathinfo($file, PATHINFO_EXTENSION) != 'json') {
+            continue;
+        }
+        // check mtime
+        if($last_reload_time < $file->getCTime()) {
+            print $file." update and reload \r\n";
+            // send SIGUSR1 signal to master process for reload
+            posix_kill(posix_getppid(), SIGUSR1);
+            // $last_reload_time = $file->getMTime();
+            $last_reload_time = time();
+            break;
+        }
+    }
+}
+
+// 运行worker
+Worker::$pidFile = "/tmp/nacosAgent.pid";
+Worker::$logFile = "/tmp/nacosAgent.log";
+Worker::runAll();
+

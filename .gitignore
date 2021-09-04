@@ -13,3 +13,6 @@ vendor/
 *.cache
 composer.lock
 config/config.php
+src/composer.lock
+src/vendor
+

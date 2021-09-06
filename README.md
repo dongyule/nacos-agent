@@ -8,7 +8,7 @@
 ## Installation
 
 ```powershell
-composer update
+composer install
 ```
 
 ### 启动

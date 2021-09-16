@@ -31,6 +31,7 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
     $nacosConfigClient = new Nacos\Config($config);
     $configModels = [];
     $dataIdTargetMap = [];
+    $dataIdDenyOpcacheCleanMap = [];
     foreach ($config['listener_config'] as $item) {
         try {
             $item['tenant'] = $config['tenant'];
@@ -42,6 +43,7 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
                 $filePath = sprintf('%s/%s', rtrim($config['config_save_path'], '/'), $item['target']);
             }
             $dataIdTargetMap[$configModel->dataId] = $filePath;
+            $dataIdDenyOpcacheCleanMap[$configModel->dataId] = empty($item['denyOpcacheClean']) ? false : true;
 
             $file = new SplFileInfo($filePath);
             if (!is_dir($file->getPath())) {
@@ -59,9 +61,22 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
             foreach ($changes as $change) {
                 print "$change->dataId content changed" . "\r\n";
                 foreach ($configModels as $configModel) {
-                    if ($change->dataId == $configModel->dataId) {
-                        $configModel->content = $nacosConfigClient->get($configModel);
-                        file_put_contents($dataIdTargetMap[$configModel->dataId], $configModel->content);
+                    if ($change->dataId != $configModel->dataId) {
+                        continue;
+                    }
+                    // 获取最新配置写入目标文件
+                    $configModel->content = $nacosConfigClient->get($configModel);
+                    file_put_contents($dataIdTargetMap[$configModel->dataId], $configModel->content);
+                    // 判断是否设置了denyOpcacheClean = true 如果没设置默认清理opcache
+                    if ($dataIdDenyOpcacheCleanMap[$change->dataId] == false) {
+                        // 清理php-fpm opcache
+                        $context = stream_context_create([
+                            'http' => [
+                                'method' => 'GET',
+                                'timeout' => 1
+                            ]
+                        ]);
+                        file_get_contents('http://127.0.0.1/opcache/opcache-clean.php', false, $context);
                     }
                 }
             }

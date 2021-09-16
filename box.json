@@ -28,6 +28,5 @@
   "compactors": [
     "KevinGH\\Box\\Compactor\\Json",
     "KevinGH\\Box\\Compactor\\Php"
-  ],
-  "git": "phar-version"
+  ]
 }

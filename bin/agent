@@ -31,7 +31,7 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
     $nacosConfigClient = new Nacos\Config($config);
     $configModels = [];
     $dataIdTargetMap = [];
-    $dataIdDenyOpcacheCleanMap = [];
+    $dataIdOpcacheCleanMap = [];
     foreach ($config['listener_config'] as $item) {
         try {
             $item['tenant'] = $config['tenant'];
@@ -43,8 +43,10 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
                 $filePath = sprintf('%s/%s', rtrim($config['config_save_path'], '/'), $item['target']);
             }
             $dataIdTargetMap[$configModel->dataId] = $filePath;
-            $dataIdDenyOpcacheCleanMap[$configModel->dataId] = empty($item['denyOpcacheClean']) ? false : true;
-
+            $dataIdOpcacheCleanMap[$configModel->dataId] = true;
+            if (isset($item['opcacheClean'])) {
+                $dataIdOpcacheCleanMap[$configModel->dataId] = boolval($item['opcacheClean']);
+            }
             $file = new SplFileInfo($filePath);
             if (!is_dir($file->getPath())) {
                 mkdir($file->getPath(), 0755, true);
@@ -68,7 +70,7 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
                     $configModel->content = $nacosConfigClient->get($configModel);
                     file_put_contents($dataIdTargetMap[$configModel->dataId], $configModel->content);
                     // 判断是否设置了denyOpcacheClean = true 如果没设置默认清理opcache
-                    if ($dataIdDenyOpcacheCleanMap[$change->dataId] == false) {
+                    if ($dataIdOpcacheCleanMap[$change->dataId] == true) {
                         // 清理php-fpm opcache
                         $context = stream_context_create([
                             'http' => [

@@ -79,6 +79,7 @@ $nacosConfigAgentWorker->onWorkerStart = function() use ($configFile) {
                             ]
                         ]);
                         file_get_contents('http://127.0.0.1/opcache/opcache-clean.php', false, $context);
+                        print "opcache clean finish \r\n";
                     }
                 }
             }
